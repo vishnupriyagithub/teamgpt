@@ -1,0 +1,90 @@
+# ======================
+# General
+# ======================
+backend/data/
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+
+# ======================
+# Node / Vite / React
+# ======================
+node_modules/
+dist/
+build/
+.vite/
+coverage/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+.env
+.env.*
+!.env.example
+
+# ======================
+# Python / FastAPI
+# ======================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# virtual environments
+venv/
+.env/
+.venv/
+myenv/
+
+# python packaging
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ======================
+# IDE / Editor
+# ======================
+.vscode/
+.idea/
+*.iml
+
+# ======================
+# OS
+# ======================
+.DS_Store
+Thumbs.db
+
+# ======================
+# Database (if local dev)
+# ======================
+*.db
+*.sqlite3
+
+# ======================
+# FastAPI runtime
+# ======================
+*.pid
+*.sock
+
+# ======================
+# Docker (optional)
+# ======================
+.dockerignore

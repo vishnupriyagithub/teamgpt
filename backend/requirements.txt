@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+chromadb
+pypdf
+google-genai
+python-multipart
+sentence-transformers
+redis
+rank-bm25
+python-jose
+google-auth
+python-dotenv
+groq>=0.4.1
