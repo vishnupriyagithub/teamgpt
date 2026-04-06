@@ -2,17 +2,20 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 from llm.gemini import GeminiLLM
 from llm.groq import GroqLLM
+from cache.redis_cache import redis_client
 from fastapi import FastAPI, UploadFile, File, Body, HTTPException, Depends
 from dependencies.auth_dep import get_current_user
 from auth.google_auth import verify_google_token
 from auth.jwt_auth import create_jwt
-from models.user_store import get_or_create_user
+# from models.user_store import get_or_create_user
 from cache.redis_cache import get_cached_answer, set_cached_answer
 from embedding import embed_texts, embed_query
 import logging
 from search.hybrid import keyword_search
-
-
+from db import SessionLocal
+from models.db_models import ChatMessage, Project
+from db import SessionLocal
+from models.db_models import User
 
 logger = logging.getLogger(__name__)
 from vector_store import get_project_collection
@@ -25,7 +28,12 @@ from utils.text import split_text
 from llm.local import LocalLLM
 # from vector_store import persist_chroma
 from llm import get_llm
+from db import engine
+from models.db_models import Base
+from models.db_models import Project
 
+
+# Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 @app.get("/debug-auth")
@@ -66,6 +74,23 @@ async def upload_document(
     file: UploadFile = File(...),
     user=Depends(get_current_user)
 ):
+    user_id = user["user_id"]
+    from models.db_models import Project
+
+    db = SessionLocal()
+
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == user_id
+    ).first()
+
+    # Allow creation if project doesn't exist yet (first upload)
+    if not project:
+        print("New project will be created")
+    else:
+        print("Existing project verified")
+
+    db.close()
     print("UPLOAD STARTED")
     if not project_id.strip():
         raise HTTPException(status_code=400, detail="project_id is required")
@@ -103,7 +128,7 @@ async def upload_document(
     with open(os.path.join(UPLOAD_DIR, file.filename), "wb") as f:
         f.write(contents)
         
-    save_project(project_id)
+    save_project(user_id, project_id)
     print("PROJECT SAVED")
 
     
@@ -116,8 +141,23 @@ async def upload_document(
 # -----------------------------
 # Ask Question (RAG)
 # -----------------------------
-@app.post("/ask")
 
+def save_chat(project_id, user_id,role, content):
+    
+    db = SessionLocal()
+    msg = ChatMessage(
+        
+        project_id=project_id,
+        user_id=user_id,
+        role=role,
+        content=content
+    )
+    
+    db.add(msg)
+    db.commit()
+    db.close()
+    
+@app.post("/ask")
 def ask_question(
     project_id: str = Body(...),
     question: str = Body(...),
@@ -125,6 +165,19 @@ def ask_question(
 ):
     print("🔥🔥🔥 ASK API HIT 🔥🔥🔥")
     print("QUESTION RECEIVED:", question)
+    user_id = user["user_id"]
+    db = SessionLocal()
+
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == user_id
+    ).first()
+
+    if not project:
+        db.close()
+        raise HTTPException(status_code=403, detail="Unauthorized project access")
+
+    db.close()
     normalized_question = question.strip().lower()
     cache_key = f"{project_id}:{normalized_question}"
     print("QUESTION:", question)
@@ -215,9 +268,12 @@ Question:
 """
     try:
         
+        
     # 5. Generate answer using Gemini
         # answer = generate_answer(prompt)
+        save_chat(project_id, user_id, "user", question)
         answer = llm.generate(prompt)
+        save_chat(project_id, user_id, "assistant", answer)
         # if (not answer or len(answer.strip()) < 10 or "i don't know" in answer.lower()):
             
         #     return {
@@ -231,6 +287,7 @@ Question:
         print("FINAL CONTEXT:", context)
         print("RAW LLM ANSWER:", answer)
         return {
+            
             "answer": answer,
             "used_context": context,
             "cached": False
@@ -238,15 +295,19 @@ Question:
     except Exception as e:
         logger.error(f"LLM generation error: {str(e)}")
         print("LLM ERROR:", str(e))
+        
         return {
             "answer": "I don't know.",
             "cached": False
         }
-
+        
+from utils.projects import get_projects
 @app.get("/projects")
-def list_projects():
-    from utils.projects import load_projects
-    return {"projects": load_projects()}
+def list_projects(user=Depends(get_current_user)):
+    # from utils.projects import load_projects
+    user_id = user["user_id"]
+    projects = get_projects(user_id)
+    return {"projects": projects}
 
 @app.get("/redis-test")
 def redis_test():
@@ -256,10 +317,36 @@ def redis_test():
 @app.post("/auth/google")
 def google_login(token: str = Body(..., embed=True)):
     user_info = verify_google_token(token)
-    user = get_or_create_user(user_info)
+    print("USER INFO FROM GOOGLE:", user_info)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+    user_id = user_info.get("user_id") or user_info.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Google token missing user ID")
+    db = SessionLocal()
+    
+    existing_user = db.query(User).filter(User.id == user_id).first()
+
+    if not existing_user:
+        
+        new_user = User(
+            
+            id=user_id,   # Google unique ID
+            email=user_info.get("email"),
+            name=user_info.get("name")
+        )
+        db.add(new_user)
+        db.commit()
+
+    db.close()
+    user = {
+    "user_id": user_id,
+    "email": user_info.get("email"),
+    "name": user_info.get("name")
+    }
 
     jwt_token = create_jwt({
-        "user_id": user["user_id"],
+        "user_id": user_id,
         "email": user["email"],
         "name": user["name"]
     })
@@ -268,3 +355,34 @@ def google_login(token: str = Body(..., embed=True)):
         "access_token": jwt_token,
         "user": user
     }
+
+@app.get("/chat/{project_id}")
+def get_chat(project_id: str, user=Depends(get_current_user)):
+    db = SessionLocal()
+    user_id = user["user_id"]
+    from models.db_models import Project
+
+    
+
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.user_id == user_id
+    ).first()
+
+    if not project:
+        db.close()
+        raise HTTPException(status_code=403, detail="Unauthorized project access")
+
+    
+    messages = db.query(ChatMessage)\
+        .filter(ChatMessage.project_id == project_id, ChatMessage.user_id == user_id)\
+        .order_by(ChatMessage.created_at)\
+        .all()
+
+    result = [
+        {"role": m.role, "content": m.content}
+        for m in messages
+    ]
+
+    db.close()
+    return {"messages": result}

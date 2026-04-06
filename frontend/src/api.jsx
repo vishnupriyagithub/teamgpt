@@ -41,7 +41,11 @@ export async function askQuestion(projectId, question) {
 }
 
 export async function fetchProjects() {
-  const res = await fetch(`${BASE_URL}/projects`);
+  const res = await fetch(`${BASE_URL}/projects`,{
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+    }
+  });
   if (!res.ok) throw new Error("Failed to fetch projects");
   return res.json();
 }

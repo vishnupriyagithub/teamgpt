@@ -21,6 +21,12 @@ export default function App() {
   chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    if (projectId){
+      loadChat(projectId);
+    }
+  }, [projectId]);
+
 
   useEffect(() => {
     if (!token) return;
@@ -30,6 +36,24 @@ export default function App() {
   }, [token]);
 
   const activeProjectId = newProjectId || projectId;
+
+  const loadChat = async (projectId) => {
+
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/chat/${projectId}`,{
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        }
+      });
+      const data = await res.json();
+      setMessages(data.messages || []);
+    } catch (e) {
+      console.error("Failed to load chat", e);
+    }
+  };
+
+
+
   // 
   const handleGoogleLogin = async (credentialResponse) => {
     try{
@@ -70,7 +94,7 @@ export default function App() {
     setNewProjectId("");
     setFile(null);
     setQuestion("");
-    setAnswer("");
+    // setAnswer("");
 
   };
   const handleNewProject = () => {
@@ -99,7 +123,7 @@ export default function App() {
       setNewProjectId("");
       setProjectId(activeProjectId);
     } catch (e) {
-      alert(e.message);
+      alert(e.message,"eorrrrr");
     }
     setLoading(false);
   };
@@ -160,7 +184,10 @@ export default function App() {
             <div
               key={p}
               className={`project-item ${projectId === p ? "active" : ""}`}
-              onClick={() => setProjectId(p)}
+              onClick={() => {
+                setProjectId(p);
+                loadChat(p);
+              }}
             >
               {p}
             </div>
@@ -188,6 +215,9 @@ export default function App() {
               {msg.content}
             </div>
           ))}
+          {loading && <div className="chat-bubble assistant">
+            <span className="typing-dots">•••</span>
+            </div>}
           <div ref={chatEndRef} />
         </div>
 

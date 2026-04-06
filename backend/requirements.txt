@@ -11,3 +11,5 @@ python-jose
 google-auth
 python-dotenv
 groq>=0.4.1
+sqlalchemy 
+psycopg2-binary
