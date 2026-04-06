@@ -9,8 +9,10 @@ def verify_google_token(token: str) -> dict:
         idinfo = id_token.verify_oauth2_token(
             token,
             requests.Request(),
-            GOOGLE_CLIENT_ID
+            GOOGLE_CLIENT_ID,
+            clock_skew_in_seconds=10
         )
+        print("token verified:", idinfo)
 
         return {
             "user_id": idinfo["sub"],
@@ -18,5 +20,6 @@ def verify_google_token(token: str) -> dict:
             "name": idinfo.get("name", "")
         }
 
-    except Exception:
+    except Exception as e:
+        print("Error verifying Google token:", str(e))
         raise ValueError("Invalid Google token")
