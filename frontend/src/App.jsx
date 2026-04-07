@@ -221,18 +221,23 @@ export default function App() {
   // block app if not logged in
   if (!token) {
     return (
-      <div className="container">
-        <h1>TeamGPT</h1>
+      <div className="login-page">
+      <div className="login-card">
+        <h1 className="logo">TeamGPT</h1>
         <p className="subtitle">Project Knowledge Assistant</p>
 
-        <div className="card">
-          <p>Please sign in with Google to continue</p>
+        <p className="login-text">
+          Sign in with Google to continue
+        </p>
+
+        <div className="google-btn">
           <GoogleLogin
             onSuccess={handleGoogleLogin}
             onError={() => alert("Google Login Failed")}
           />
         </div>
       </div>
+    </div>
     );
   }
   return (
