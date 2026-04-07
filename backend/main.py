@@ -16,7 +16,7 @@ from db import SessionLocal
 from models.db_models import ChatMessage, Project
 from db import SessionLocal
 from models.db_models import User
-
+from models.db_models import Document
 logger = logging.getLogger(__name__)
 from vector_store import get_project_collection
 import os
@@ -125,11 +125,25 @@ async def upload_document(
             }]
         )
     print("CHROMA INSERT DONE")
-    with open(os.path.join(UPLOAD_DIR, file.filename), "wb") as f:
+    file_path = os.path.join(UPLOAD_DIR, f"{project_id}_{file.filename}")
+    with open(file_path, "wb") as f:
         f.write(contents)
+                             
+    # with open(os.path.join(UPLOAD_DIR, file.filename), "wb") as f:
+        # f.write(contents)
         
     save_project(user_id, project_id)
     print("PROJECT SAVED")
+    doc= Document(
+        project_id=project_id,
+        user_id=user_id,
+        filename=file.filename,
+        file_path=file_path
+    )
+    db = SessionLocal()
+    db.add(doc) 
+    db.commit()
+    db.close()
 
     
     
@@ -138,6 +152,26 @@ async def upload_document(
         "chunks": len(chunks)
     }
 
+
+@app.get("/documents/{project_id}")
+def get_documents(project_id: str, user=Depends(get_current_user)):
+    db = SessionLocal()
+    user_id = user["user_id"]
+    
+    doc =   db.query(Document).filter(
+        Document.project_id == project_id,
+        Document.user_id == user_id
+        
+    ).all()
+    result = [
+        {
+            "filename": d.filename,
+            "uploaded_at": d.created_at
+        }
+        for d in doc
+    ]
+    db.close()
+    return {"documents": result}
 # -----------------------------
 # Ask Question (RAG)
 # -----------------------------

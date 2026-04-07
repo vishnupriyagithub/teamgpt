@@ -35,3 +35,13 @@ class ChatMessage(Base):
     role = Column(String)  # user / assistant
     content = Column(Text)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+class Document(Base):
+    __tablename__ = "documents"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id = Column(String)
+    user_id = Column(String)
+    filename = Column(String)
+    file_path = Column(String)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
