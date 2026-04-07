@@ -222,22 +222,23 @@ export default function App() {
   if (!token) {
     return (
       <div className="login-page">
-      <div className="login-card">
-        <h1 className="logo">TeamGPT</h1>
-        <p className="subtitle">Project Knowledge Assistant</p>
+        <div className="bg-animation"></div>
+        <div className="login-card">
+          <h1 className="logo">TeamGPT</h1>
+          <p className="subtitle">Project Knowledge Assistant</p>
 
-        <p className="login-text">
-          Sign in with Google to continue
-        </p>
+          <p className="login-text">
+            Sign in with Google to continue
+          </p>
 
-        <div className="google-btn">
-          <GoogleLogin
-            onSuccess={handleGoogleLogin}
-            onError={() => alert("Google Login Failed")}
-          />
+          <div className="google-btn">
+            <GoogleLogin
+              onSuccess={handleGoogleLogin}
+              onError={() => alert("Google Login Failed")}
+            />
+          </div>
         </div>
       </div>
-    </div>
     );
   }
   return (

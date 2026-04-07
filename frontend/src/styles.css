@@ -208,14 +208,16 @@ body {
 
 /* Card */
 .login-card {
-  background: white;
+  position: relative;
+  z-index: 2;
+  background: rgba(215, 220, 228, 0.219);
+  backdrop-filter: blur(20px);
   padding: 40px 32px;
   border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
   text-align: center;
   width: 100%;
   max-width: 400px;
-  transition: all 0.02 ease;
+  color: white;
 }
 
 .login-card:hover {
@@ -227,14 +229,14 @@ body {
   margin: 0;
   font-size: 28px;
   font-weight: 700;
-  color: #2563eb;
+  color: rgb(255, 255, 255)
 }
 
 /* Subtitle */
 .subtitle {
   margin-top: 6px;
   margin-bottom: 20px;
-  color: #64748b;
+  color: #cbd5f5;
   font-size: 14px;
 }
 
@@ -242,13 +244,14 @@ body {
 .login-text {
   margin-bottom: 20px;
   font-size: 14px;
-  color: #334155;
+  color: #cbd5f5;
 }
 
 /* Google button wrapper */
 .google-btn {
   display: flex;
   justify-content: center;
+  
 }
 /* Upload button inside input */
 /* .upload-btn {
@@ -351,6 +354,63 @@ svg {
   display: block !important;
   stroke: white !important;
   fill: none !important;
+}
+
+/* page layout */
+.login-page {
+  position: relative;
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #0f172a; /* dark base */
+}
+
+/* animated blobs */
+.bg-animation {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* blobs */
+.bg-animation::before,
+.bg-animation::after {
+  content: "";
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.6;
+  animation: moveBlob 12s infinite alternate ease-in-out;
+}
+
+/* blob colors */
+.bg-animation::before {
+  background: #2563eb;
+  top: -100px;
+  left: -100px;
+}
+
+.bg-animation::after {
+  background: #7c3aed;
+  bottom: -100px;
+  right: -100px;
+  animation-delay: 3s;
+}
+
+/* animation */
+@keyframes moveBlob {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(100px, 80px) scale(1.2);
+  }
 }
 /* Center the entire app */
 /* .container {
