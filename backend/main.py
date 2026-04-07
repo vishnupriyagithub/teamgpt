@@ -354,7 +354,10 @@ def google_login(token: str = Body(..., embed=True)):
     print("USER INFO FROM GOOGLE:", user_info)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid Google token")
+    name= user_info.get("name") or "User"
     user_id = user_info.get("user_id") or user_info.get("sub")
+    email = user_info.get("email")
+    
     if not user_id:
         raise HTTPException(status_code=401, detail="Google token missing user ID")
     db = SessionLocal()
@@ -375,8 +378,9 @@ def google_login(token: str = Body(..., embed=True)):
     db.close()
     user = {
     "user_id": user_id,
-    "email": user_info.get("email"),
-    "name": user_info.get("name")
+    "email": email,
+    "name": name,
+    "picture": user_info.get("picture")
     }
 
     jwt_token = create_jwt({
