@@ -5,6 +5,8 @@ import { GoogleLogin } from "@react-oauth/google";
 import { useRef } from "react";
 import {Menu, Plus, Folder} from "lucide-react";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
 export default function App() {
   const [projectId, setProjectId] = useState("");
   const [projects, setProjects] = useState([]);
@@ -33,7 +35,7 @@ export default function App() {
       if (!token) return;
 
       try {
-        const res = await fetch("http://127.0.0.1:8000/projects", { 
+        const res = await fetch(`${API_URL}/projects`, { 
           headers: {
             Authorization: `Bearer ${token}`,
           }
@@ -76,7 +78,7 @@ export default function App() {
   const loadChat = async (projectId) => {
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/chat/${projectId}`,{
+      const res = await fetch(`${API_URL}/chat/${projectId}`,{
         headers: {
           Authorization: `Bearer ${localStorage.getItem("access_token")}`,
         }
@@ -95,7 +97,7 @@ export default function App() {
     try{
       
       const googleIdToken = credentialResponse.credential;
-      const res = await fetch("http://127.0.0.1:8000/auth/google", {
+      const res = await fetch(`${API_URL}/auth/google`, {
 
         method: "POST",
         headers: { "Content-Type": "application/json" },
