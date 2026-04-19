@@ -1,5 +1,5 @@
 from db import SessionLocal
-from models.db_models import Project
+from models.db_models import Project, ProjectMember, User
 
 
 def save_project(user_id, project_id):
@@ -15,9 +15,18 @@ def save_project(user_id, project_id):
         project = Project(
             id=project_id,
             user_id=user_id,
+            owner_id=user_id,
             name=project_id
         )
         db.add(project)
+        db.flush()
+        member = ProjectMember(
+            project_id=project_id,
+            user_id=user_id,
+            invited_by=user_id,
+            role="team_lead"
+        )
+        db.add(member)
         db.commit()
 
     db.close()
@@ -26,15 +35,22 @@ def save_project(user_id, project_id):
 def get_projects(user_id):
     db = SessionLocal()
 
-    projects = db.query(Project).filter(
-        Project.user_id == user_id
+    memberships = db.query(ProjectMember).filter(
+        ProjectMember.user_id == user_id
     ).all()
-
-    result = [p.id for p in projects]
-
+    result = [m.project_id for m in memberships]
     db.close()
     return result
 
+def get_project_role(user_id, project_id):
+    """Returns 'team_lead', 'member', or None if no access."""
+    db = SessionLocal()
+    membership = db.query(ProjectMember).filter(
+        ProjectMember.project_id == project_id,
+        ProjectMember.user_id == user_id
+    ).first()
+    db.close()
+    return membership.role if membership else None
 # # utils/projects.py
 # import json
 # import os

@@ -16,6 +16,7 @@ class User(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     email = Column(String)
     name = Column(String)
+    # role = Column(String, default="member") 
 
 
 class Project(Base):
@@ -23,8 +24,18 @@ class Project(Base):
 
     id = Column(String, primary_key=True)
     user_id = Column(String, ForeignKey("users.id"))
+    owner_id = Column(String, ForeignKey("users.id")) 
     name = Column(String)
 
+class ProjectMember(Base):
+    __tablename__ = "project_members"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id = Column(String, ForeignKey("projects.id"))
+    user_id = Column(String, ForeignKey("users.id"))
+    invited_by = Column(String, ForeignKey("users.id"))
+    role = Column(String, default="member")  
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
@@ -45,3 +56,4 @@ class Document(Base):
     filename = Column(String)
     file_path = Column(String)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    

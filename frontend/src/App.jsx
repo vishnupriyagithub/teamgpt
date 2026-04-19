@@ -20,12 +20,9 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showNewProject, setShowNewProject] = useState(false);
   const [serverWaking, setServerWaking] = useState(false);
-  const [username, setUsername] = useState(
-  localStorage.getItem("user_name") || "User"
-  );
-  const [userPicture, setUserPicture] = useState(
-    localStorage.getItem("user_picture") || "👤 "
-  );
+  const [username, setUsername] = useState(localStorage.getItem("user_name") || "User");
+  const [userPicture, setUserPicture] = useState(localStorage.getItem("user_picture") || "👤 ");
+  const [projectRole, setProjectRole] = useState(null);
 
 
   
@@ -79,6 +76,13 @@ export default function App() {
   const loadChat = async (projectId) => {
 
     try {
+      const roleRes = await fetch(`${API_URL}/projects/${projectId}/my-role`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
+      });
+      if (roleRes.ok) {
+        const roleData = await roleRes.json();
+        setProjectRole(roleData.role);
+      }
       const res = await fetch(`${API_URL}/chat/${projectId}`,{
         headers: {
           Authorization: `Bearer ${localStorage.getItem("access_token")}`,
@@ -122,6 +126,7 @@ export default function App() {
       setToken(data.access_token);
       setUsername(data.user?.name || "User");
       setUserPicture(data.user?.picture || "");
+      
 
     } catch (e) {
       console.error("Login error", e);
@@ -133,6 +138,7 @@ export default function App() {
   const handleLogout = () => {
     localStorage.clear();
     setToken(null);
+    setProjectRole(null);
     setProjects([]);
     setProjectId("");
     setNewProjectId("");
@@ -141,13 +147,31 @@ export default function App() {
     // setAnswer("");
 
   };
-  const handleNewProject = () => {
+  const handleNewProject = async () => {
     const name = prompt("Enter project name:");
     if (!name) return;
+     
+    try {
+      // create the project on the backend immediately
+      const res = await fetch(`${API_URL}/projects/create`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+        },
+        body: JSON.stringify({ project_id: name }),
+      });
+      if (!res.ok) throw new Error("Failed to create project");
 
-    setProjectId(name);
-    setMessages([]);
+      const data = await fetchProjects();
+      setProjects(data.projects || []);
+      setProjectId(name);
+      setMessages([]);
+    } catch (e) {
+      alert("Failed to create project: " + e.message);
+    }
   };
+    
 
   
 
@@ -233,10 +257,8 @@ export default function App() {
         <div className="login-card">
           <h1 className="logo">TeamGPT</h1>
           <p className="subtitle">Project Knowledge Assistant</p>
-
-          <p className="login-text">
-            Sign in with Google to continue
-          </p>
+          
+          <p className="login-text">Sign in with Google to continue</p>
 
           <div className="google-btn">
             <GoogleLogin
@@ -264,12 +286,15 @@ export default function App() {
         </div>
         
         {/* new project */}
-        <div className="sidebar-header">
+        {(projectRole === "team_lead" || !projectId) &&(
+          <div className="sidebar-header">
             <button className= "new-project-btn" onClick={handleNewProject}>
-            <Plus size={18} style={{minWidth:"18px"}}/>
-            {sidebarOpen && <span>New Project</span>}
-          </button>
-        </div>
+              <Plus size={18} style={{minWidth:"18px"}}/>
+              {sidebarOpen && <span>New Project</span>}
+            </button>
+          </div>
+        )}
+        
         {/* Projects */}
         <div className="project-list">
           {projects.map((p) => (
@@ -283,7 +308,42 @@ export default function App() {
               title={p}
             >
               <Folder size={18} style={{minWidth:"18px"}} />
-              {sidebarOpen && <span>{p}</span>}
+              {sidebarOpen && <span style={{ flex: 1 }}>{p}</span>}
+              {/* {sidebarOpen && <span>{p}</span>} */}
+              {projectRole === "team_lead" && sidebarOpen && p===projectId && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation(); // don't switch project when clicking invite
+                    const email = prompt(`Enter email to invite to "${p}":`);
+                    if (!email) return;
+                    fetch(`${API_URL}/projects/${p}/invite`, {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+                      },
+                      body: JSON.stringify({ email }),
+                    })
+                      .then((res) => res.json())
+                      .then((data) => alert(data.message))
+                      .catch((err) => {
+                        console.error("invite error:", err);
+                        alert("invite failed:" +err.message);
+                      });
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "2px 4px",
+                    borderRadius: "4px",
+                    opacity: 0.7,
+                  }}
+                  title="Invite member"
+                >
+                  <Plus size={14} color="white" />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -406,12 +466,16 @@ export default function App() {
             }}
               
           />
-          <button
-            className="upload-btn"
-            onClick={() => document.getElementById("fileUpload").click()}
-          >
-            <Plus size={18} color="#ffff" />
-          </button>
+          {projectRole=="team_lead" &&(
+            <button
+              className="upload-btn"
+              onClick={() => document.getElementById("fileUpload").click()}
+            >
+              <Plus size={18} color="#ffff" />
+            </button>
+          )}
+          
+
           <input
             value={question}
             onChange={(e) => setQuestion(e.target.value)}

@@ -3,7 +3,7 @@ load_dotenv(override=True)
 from llm.gemini import GeminiLLM
 from llm.groq import GroqLLM
 from cache.redis_cache import redis_client
-from fastapi import FastAPI, UploadFile, File, Body, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, Body, HTTPException, Depends , Response
 from dependencies.auth_dep import get_current_user
 from auth.google_auth import verify_google_token
 from auth.jwt_auth import create_jwt
@@ -13,16 +13,13 @@ from embedding import embed_texts, embed_query
 import logging
 from search.hybrid import keyword_search
 from db import SessionLocal
-from models.db_models import ChatMessage, Project
-from db import SessionLocal
-from models.db_models import User
-from models.db_models import Document
+from models.db_models import ChatMessage, Project, User, Document, ProjectMember
 logger = logging.getLogger(__name__)
 from vector_store import get_project_collection
 import os
 import uuid
 from fastapi.middleware.cors import CORSMiddleware
-from utils.projects import save_project
+from utils.projects import save_project,get_projects, get_project_role
 from utils.text import split_text
 # from llm.gemini import GeminiLLM
 from llm.local import LocalLLM
@@ -78,26 +75,16 @@ async def upload_document(
     file: UploadFile = File(...),
     user=Depends(get_current_user)
 ):
-    user_id = user["user_id"]
-    from models.db_models import Project
+    user_id =user["user_id"]
+    project_role = get_project_role(user_id, project_id)
+    if project_role != "team_lead":
+        raise HTTPException(status_code=403, detail="Only project team leads can upload documents")
 
-    db = SessionLocal()
-
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.user_id == user_id
-    ).first()
-
-    # Allow creation if project doesn't exist yet (first upload)
-    if not project:
-        print("New project will be created")
-    else:
-        print("Existing project verified")
-
-    db.close()
-    print("UPLOAD STARTED")
     if not project_id.strip():
         raise HTTPException(status_code=400, detail="project_id is required")
+    
+    
+
     
     contents = await file.read()
     print("FILE READ DONE")
@@ -159,13 +146,14 @@ async def upload_document(
 
 @app.get("/documents/{project_id}")
 def get_documents(project_id: str, user=Depends(get_current_user)):
-    db = SessionLocal()
+    
     user_id = user["user_id"]
+    if not get_project_role(user_id, project_id):
+        raise HTTPException(status_code=403, detail="No access to this project")
+    db = SessionLocal()
     
     doc =   db.query(Document).filter(
-        Document.project_id == project_id,
-        Document.user_id == user_id
-        
+        Document.project_id == project_id,  
     ).all()
     result = [
         {
@@ -201,21 +189,16 @@ def ask_question(
     question: str = Body(...),
     user=Depends(get_current_user)
 ):
+    
     print("🔥🔥🔥 ASK API HIT 🔥🔥🔥")
     print("QUESTION RECEIVED:", question)
+
     user_id = user["user_id"]
-    db = SessionLocal()
+    project_role = get_project_role(user_id, project_id)
+    if not project_role:
+        raise HTTPException(status_code=403, detail="You don't have access to this project")
 
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.user_id == user_id
-    ).first()
-
-    if not project:
-        db.close()
-        raise HTTPException(status_code=403, detail="Unauthorized project access")
-
-    db.close()
+     
     normalized_question = question.strip().lower()
     cache_key = f"{project_id}:{normalized_question}"
     print("QUESTION:", question)
@@ -238,27 +221,17 @@ def ask_question(
             "used_context": "(from cache)"
         }
     collection = get_project_collection(project_id)
-    
-    
-
     # 1. Embed the question
     query_vector = embed_query(question)
     print("QUERY VECTOR:", query_vector[:5])  # sample
-
-    
-
     # 2. Retrieve relevant chunks
     
     vector_results = collection.query(
         query_embeddings=[query_vector],
         n_results=5
     )
-    
-
     print("VECTOR RESULTS:", vector_results)
 
-    
-    
     vector_docs = vector_results.get("documents", [[]])[0] 
     print("VECTOR DOCS:", vector_docs)
     if not vector_docs:
@@ -347,6 +320,15 @@ def list_projects(user=Depends(get_current_user)):
     projects = get_projects(user_id)
     return {"projects": projects}
 
+# new endpoint — returns user's role for a specific project
+@app.get("/projects/{project_id}/my-role")
+def get_my_role(project_id: str, user=Depends(get_current_user)):
+    user_id = user["user_id"]
+    role = get_project_role(user_id, project_id)
+    if not role:
+        raise HTTPException(status_code=403, detail="No access to this project")
+    return {"role": role}
+
 @app.get("/redis-test")
 def redis_test():
     redis_client.set("hello", "world",ex=10)
@@ -375,9 +357,12 @@ def google_login(token: str = Body(..., embed=True)):
             id=user_id,   # Google unique ID
             email=user_info.get("email"),
             name=user_info.get("name")
+            
         )
         db.add(new_user)
         db.commit()
+        
+    
 
     db.close()
     user = {
@@ -385,12 +370,14 @@ def google_login(token: str = Body(..., embed=True)):
     "email": email,
     "name": name,
     "picture": user_info.get("picture")
+    
     }
 
     jwt_token = create_jwt({
         "user_id": user_id,
         "email": user["email"],
         "name": user["name"]
+        
     })
 
     return {
@@ -400,22 +387,15 @@ def google_login(token: str = Body(..., embed=True)):
 
 @app.get("/chat/{project_id}")
 def get_chat(project_id: str, user=Depends(get_current_user)):
-    db = SessionLocal()
+    
     user_id = user["user_id"]
-    from models.db_models import Project
+    project_role = get_project_role(user_id, project_id)
+    if not project_role:
+        raise HTTPException(status_code=403, detail="You don't have access to this project")
 
-    
 
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.user_id == user_id
-    ).first()
+    db = SessionLocal()
 
-    if not project:
-        db.close()
-        raise HTTPException(status_code=403, detail="Unauthorized project access")
-
-    
     messages = db.query(ChatMessage)\
         .filter(ChatMessage.project_id == project_id, ChatMessage.user_id == user_id)\
         .order_by(ChatMessage.created_at)\
@@ -428,3 +408,54 @@ def get_chat(project_id: str, user=Depends(get_current_user)):
 
     db.close()
     return {"messages": result}
+
+@app.post("/projects/{project_id}/invite")
+def invite_member(
+    project_id: str,
+    email: str = Body(..., embed=True),
+    invite_role: str = Body("member", embed=True), 
+    user=Depends(get_current_user)
+):
+    user_id = user["user_id"]
+    project_role = get_project_role(user_id, project_id)
+    if project_role != "team_lead":
+        raise HTTPException(status_code=403, detail="Only project team leads can invite members")
+    
+
+    db = SessionLocal()
+    
+    # find the user by email
+    invitee = db.query(User).filter(User.email == email).first()
+    if not invitee:
+        db.close()
+        raise HTTPException(status_code=404, detail="No user found with that email. They need to sign up first.")
+
+    # check not already a member
+    existing = db.query(ProjectMember).filter(
+        ProjectMember.project_id == project_id,
+        ProjectMember.user_id == invitee.id
+    ).first()
+    if existing:
+        db.close()
+        return {"message": "User already has access"}
+    invitee_name = invitee.name
+    member = ProjectMember(
+        project_id=project_id,
+        user_id=invitee.id,
+        invited_by=user["user_id"],
+        role = invite_role
+    )
+    db.add(member)
+    db.commit()
+    db.close()
+
+    return {"message": f"{invitee_name} has been given access to {project_id}"}
+
+@app.post("/projects/create")
+def create_project(
+    project_id: str = Body(..., embed=True),
+    user=Depends(get_current_user)
+):
+    user_id = user["user_id"]
+    save_project(user_id, project_id)
+    return {"message": f"Project {project_id} created", "project_id": project_id}
