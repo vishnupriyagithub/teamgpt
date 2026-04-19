@@ -19,6 +19,7 @@ export default function App() {
   const chatEndRef = useRef(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showNewProject, setShowNewProject] = useState(false);
+  const [serverWaking, setServerWaking] = useState(false);
   const [username, setUsername] = useState(
   localStorage.getItem("user_name") || "User"
   );
@@ -210,11 +211,15 @@ export default function App() {
 
     
     try {
-      const res = await askQuestion(activeProjectId, question);
+      const res = await askQuestion(activeProjectId, question, {
+      onWaking: () => setServerWaking(true),
+      });
+      setServerWaking(false); 
       const assistantMessage = { role: "assistant", content: res.answer };
       setMessages((prev) => [...prev, assistantMessage]);
       
     } catch (e) {
+      setServerWaking(false);
       alert(e.message);
     }
     setLoading(false);
@@ -285,12 +290,23 @@ export default function App() {
         <div className="sidebar-footer">
           <div className="user-info">
             {userPicture ? (
-              <img src={userPicture} alt="avatar" className="avatar-img" />
-            ) : (
-              <div className="avatar">
-                {username.charAt(0).toUpperCase()}
-              </div>
-            )}
+              <img 
+                src={userPicture} 
+                alt="avatar" 
+                className="avatar-img" 
+                referrerPolicy="no-referrer"
+                onError={(e)=>{
+                  e.target.style.display= "none";
+                  e.target.nextSibling.style.display = "flex";
+                }}
+              />
+            ) : null} 
+            <div 
+              className="avatar"
+              style={{display: userPicture ? "none" : "flex"}}
+            >
+              {username.charAt(0).toUpperCase()}
+            </div>
             {sidebarOpen && <span>{username}</span>}
           </div>
         </div> 
@@ -361,6 +377,20 @@ export default function App() {
             <button onClick={handleUpload}>Upload</button>
           </div>
         )} */}
+        {/* ✅ ADD THIS — server waking banner */}
+        {serverWaking && (
+          <div style={{
+            textAlign: "center",
+            padding: "8px 16px",
+            fontSize: "13px",
+            color: "#92400e",
+            background: "#fef3c7",
+            borderRadius: "8px",
+            margin: "0 16px 8px",
+          }}>
+            ⏳ Server is starting up, please wait a moment…
+          </div>
+        )}
 
         {/* Input Area */}
         <div className="chat-input-area">

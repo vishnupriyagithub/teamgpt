@@ -1,5 +1,21 @@
 const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
+async function fetchWithRetry(url, options = {}, { retries = 3, delay = 5000, onWaking } = {}) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url, options);
+      if (res.ok) return res;
+      throw new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      if (i < retries - 1) {
+        onWaking?.();                              // show the banner
+        await new Promise(r => setTimeout(r, delay));
+      } else {
+        throw e;
+      }
+    }
+  }
+}
 export async function uploadDocument(projectId, file) {
   const formData = new FormData();
   formData.append("project_id", projectId);
