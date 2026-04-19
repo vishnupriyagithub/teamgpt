@@ -17,7 +17,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState(localStorage.getItem("access_token"));
   const chatEndRef = useRef(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
   const [showNewProject, setShowNewProject] = useState(false);
   const [serverWaking, setServerWaking] = useState(false);
   const [username, setUsername] = useState(localStorage.getItem("user_name") || "User");
@@ -304,6 +304,7 @@ export default function App() {
               onClick={() => {
                 setProjectId(p);
                 loadChat(p);
+                if (window.innerWidth <= 768) setSidebarOpen(false);
               }}
               title={p}
             >
@@ -373,6 +374,11 @@ export default function App() {
       
         
       </div>
+      <div
+
+        className={`sidebar-backdrop ${sidebarOpen ? "visible" : ""}`}
+        onClick={() => setSidebarOpen(false)}
+      />
 
         {/* <div className="sidebar-header">
           <button style={{fontSize:"18px"}} onClick={() => setSidebarOpen(!sidebarOpen)}>
@@ -403,12 +409,18 @@ export default function App() {
       <div className="main-area">
 
         {/* Top Bar */}
+        {/* Top Bar */}
         <div className="top-bar">
+          {/* hamburger — only visible on mobile via CSS */}
+          <button
+            className="menu-btn-mobile"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+          >
+            <Menu size={20} color="#111" />
+          </button>
           <h2>TeamGPT</h2>
-          
           <button onClick={handleLogout}>Logout</button>
         </div>
-
         {/* Chat Messages */}
         <div className="chat-container">
           <div className="chat-window">
